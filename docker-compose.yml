@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-enterprise:9.5.2
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+      - ./conf/grafana:/etc/grafana
+    networks:
+      - grafananetwork
+  
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.44.0
+    restart: unless-stopped
+    ports:
+      - 9090:9090
+    networks:
+      - grafananetwork
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+  
+  agent:
+    container_name: agent
+    image: grafana/agent:v0.33.2
+    restart: unless-stopped
+    volumes:
+      - ./conf/grafana-agent/agent-linux.yaml:/etc/agent/agent.yaml
+    networks:
+      - grafananetwork
+
+  loki:
+    container_name: loki
+    image: grafana/loki:2.8.2
+    restart: unless-stopped
+    ports:
+      - 3100:3100
+      - 7946
+      - 9095
+    networks:
+      - grafananetwork
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - '-config.file=/etc/loki/local-config.yaml'
+
+networks:
+  grafananetwork:
+    name: grafananetwork
